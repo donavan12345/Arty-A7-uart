@@ -1,0 +1,5 @@
+tools/Vivado/
+tools/Modelsim/modelsim.bat
+tools/Modelsim/transcript
+tools/Modelsim/*.wlf
+tools/Modelsim/work/
