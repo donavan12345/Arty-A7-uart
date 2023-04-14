@@ -6,8 +6,10 @@ module uart_top (
    output reg [7:0] LED);
 
 
-parameter CLK_PER_BIT = 868;               // Clock per bit is created using (100000000Hz)/(115200 baud) = 868
-parameter PACK_SIZE = 8;                   // Sets number of bits for UART transfer
+parameter CLK_PER_BIT = 868;     // Clock per bit is created using (100000000Hz)/(115200 baud) = 868
+parameter PACK_SIZE   = 8;       // Sets number of bits for UART transfer
+parameter PARITY_EN   = 0;       // Sets if parity is enabled
+parameter EVEN_PAR    = 1;       // Sets even or odd parity (0 odd, 1 even)
 
 logic reset;
 logic strobe_1sec;
@@ -52,7 +54,9 @@ end
 // uart wrapper module
 uart_tx_rx #(
     .CLK_PER_BIT(CLK_PER_BIT),
-    .PACK_SIZE(PACK_SIZE)
+    .PACK_SIZE(PACK_SIZE),
+    .PARITY_EN(PARITY_EN),
+    .EVEN_PAR(EVEN_PAR)
 ) u_uart_wrapper0 (
     .clk(CLK100MHZ),
     .rst(reset),
@@ -60,6 +64,8 @@ uart_tx_rx #(
     .rx_byte_valid(rx_byte_valid),
     .rx_byte_data(rx_byte_data),
     .rx_active(rx_active),
+    .par_error(),
+    .stop_error(),
     .tx_byte_valid(tx_byte_valid),
     .tx_byte_data(tx_byte_data),
     .tx_bit(uart_rxd_out),

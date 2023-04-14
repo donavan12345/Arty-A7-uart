@@ -2,7 +2,9 @@
 
 // Clock per bit is created using (100000000Hz)/(115200 baud) = 868
 // Parameterizable UART data packet size
-module uart_tx #( parameter CLK_PER_BIT = 868, PACK_SIZE = 8) (
+// PARITY_EN enables the parity bit (1 or 0)
+// EVEN_PAR says if even or odd parity (0 odd, 1 even)
+module uart_tx #( parameter CLK_PER_BIT = 868, PACK_SIZE = 8, PARITY_EN = 0, EVEN_PAR = 0) (
     input                    clk,             // input
     input                    rst,             // input
     input                    tx_byte_valid,   // input
@@ -21,7 +23,7 @@ logic [CLK_INDEX - 1 : 0]  clk_counter; // Keep track of clock cycles
 logic [DATA_BITS - 1 : 0]  data_index;  // Keep track of data bit being used
 
 // Create states for state machine
-enum {IDLE, START, DATA, STOP} TX_STATE;
+enum {IDLE, START, DATA, PARITY, STOP} TX_STATE;
 
 
 // Entire state machine is registered which means I don't
@@ -37,10 +39,10 @@ always_ff @(posedge clk) begin
             data_index  <= '0;
             tx_active   <= '0;
             tx_done     <= '0;
+            tx_bit      <= '1;
             // Capture data and set out bit to 0 for START stage
             if (tx_byte_valid) begin
                 tx_data_cap <= tx_byte_data;
-                tx_bit      <= 1'b0;
                 tx_active   <= 1'b1;
                 TX_STATE    <= START;
             end
@@ -48,6 +50,8 @@ always_ff @(posedge clk) begin
 
         // START: Send start bit
         START: begin
+            // Set start bit
+            tx_bit <= 1'b0;
             // When enough clock cycles have passed to hit baud rate
             // clear clock and move to data send
             if (clk_counter >= CLK_PER_BIT - 1) begin
@@ -67,8 +71,12 @@ always_ff @(posedge clk) begin
             if (clk_counter >= CLK_PER_BIT - 1) begin
                 // If all data has been processed then move to send stop bit
                 if (data_index == PACK_SIZE - 1) begin
-                    tx_bit      <= 1'b1;
-                    TX_STATE    <= STOP;
+                    // Go to parity stage if parity is enabled
+                    if(PARITY_EN) begin
+                        TX_STATE    <= PARITY;
+                    end else begin
+                        TX_STATE    <= STOP;
+                    end
                     data_index  <= '0;
                 // If there is more data to send then increment data index
                 // and stay in data state
@@ -81,9 +89,30 @@ always_ff @(posedge clk) begin
                 clk_counter <= clk_counter + 1;
             end
         end
-        
+
+        // PARITY: Add in parity bit based on what parameters are set for module
+        PARITY: begin
+            // Give even or odd parity based on parameter set
+            if (EVEN_PAR) begin
+                tx_bit <= ^tx_data_cap; // This is the xor of all data bits
+            end else begin
+                tx_bit <= ~^tx_data_cap;
+            end
+
+            // Move on to stop bit once the baud rate is hit
+            if (clk_counter >= CLK_PER_BIT - 1) begin
+                TX_STATE <= STOP;
+                clk_counter <= '0;
+            end else begin
+                clk_counter <= clk_counter + 1;
+            end
+        end
+
         // STOP: Send stop bit and return to IDLE
         STOP: begin
+            // Set stop bit
+            tx_bit <= 1'b1;
+
             // Wait until stop bit has been transferred and then 
             // transistion back to IDLE state and signal done
             if (clk_counter >= CLK_PER_BIT - 1) begin
@@ -104,9 +133,10 @@ endmodule
 
 module uart_tx_tb();
 
-parameter CLK_PER_BIT = 10; // Using 10 to cut down sim time
+parameter CLK_PER_BIT = 3;  // Using 3 to cut down sim time
 parameter PACK_SIZE   = 8;  // Packet sizes
-
+parameter PARITY_EN   = 1;  // Sets if parity is enabled
+parameter EVEN_PAR    = 1;  // Sets even or odd parity (0 odd, 1 even)
 // Define the signals
 logic clk;
 logic rst;
@@ -119,7 +149,9 @@ logic tx_done;
 // Instantiate module
 uart_tx #(
     .CLK_PER_BIT(CLK_PER_BIT),
-    .PACK_SIZE(PACK_SIZE)
+    .PACK_SIZE(PACK_SIZE),
+    .PARITY_EN(PARITY_EN),
+    .EVEN_PAR(EVEN_PAR)
 ) dut (
     .clk(clk),
     .rst(rst),
@@ -154,7 +186,7 @@ endtask
 initial begin
     rst <= 1; tx_byte_valid <= '0; tx_byte_data <= '0; @(posedge clk);
     rst <= 0; @(posedge clk);
-    send_packet(8'hFE);
+    send_packet(8'hAA);
     repeat(2)@(posedge clk);
 
     $stop;
