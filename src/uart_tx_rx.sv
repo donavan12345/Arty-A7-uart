@@ -54,6 +54,8 @@ uart_tx #(
 
 endmodule
 
+
+// Minimal test bench since most testing is done in uart_rx and uart_tx
 module uart_tx_rx_tb ();
 
 parameter CLK_PER_BIT = 10;      // Using 10 to cut down sim time
@@ -123,7 +125,7 @@ task send_packet;
 endtask
 
 initial begin
-    rst <= 1; tx_byte_valid <= '0; tx_byte_data <= '0;@(posedge clk);
+    rst <= 1; tx_byte_valid <= '0; tx_byte_data <= '0; @(posedge clk);
     rst <= 0; @(posedge clk);
     send_packet(PACK_DATA);
     wait(rx_byte_valid);
