@@ -1,102 +1,94 @@
-module uart_top (
-   input CLK100MHZ,
-   input [3:0] sw,
-   input uart_txd_in,
-   output uart_rxd_out,
-   output reg [7:0] LED);
+// Clock per bit is created using (100000000Hz)/(115200 baud) = 868
+// Parameterizable UART data packet size
+// PARITY_EN enables the parity bit (1 or 0)
+// EVEN_PAR says if even or odd parity (0 odd, 1 even)
 
+module uart_top #( parameter CLK_PER_BIT = 868, PACK_SIZE = 8, PARITY_EN = 0, EVEN_PAR = 0) (    
+    input                           clk,             // input
+    input                           rst,             // input
+    input                           rx_bit,          // input
+    output logic                    rx_byte_valid,   // output
+    output logic [PACK_SIZE - 1 :0] rx_byte_data,    // output [PACK_SIZE - 1 :0]
+    output logic                    rx_active,       // output
+    output logic                    par_error,       // output
+    output logic                    stop_error,      // output
+    input                           tx_byte_valid,   // input
+    input [PACK_SIZE - 1 :0]        tx_byte_data,    // input [PACK_SIZE - 1 :0]
+    output logic                    tx_bit,          // output
+    output logic                    tx_active,       // output
+    output logic                    tx_done          // output
+    );
 
-parameter CLK_PER_BIT = 868;     // Clock per bit is created using (100000000Hz)/(115200 baud) = 868
-parameter PACK_SIZE   = 8;       // Sets number of bits for UART transfer
-parameter PARITY_EN   = 0;       // Sets if parity is enabled
-parameter EVEN_PAR    = 1;       // Sets even or odd parity (0 odd, 1 even)
-
-logic reset;
-logic strobe_1sec;
-
-// tx signal set
-logic [PACK_SIZE - 1 : 0] tx_byte_data;   // Data packet to send on uart
-logic                     tx_byte_valid;  // Valid for tx data packet
-logic                     tx_active;      // Shows when a uart tx is sending
-
-// rx signal set
-logic [PACK_SIZE - 1 : 0] rx_byte_data;    // Data packet to send on uart
-logic                     rx_byte_valid;   // Valid for tx data packet
-logic                     rx_active;       // Shows when a uart tx is sending
-logic                     par_error;       // Strobes when parity error detected
-logic                     stop_error;      // Strobes when stop error detected
-logic                     par_error_flag;  // Sets up a flag for the LED to strobe on par error
-logic                     stop_error_flag; // Sets up a flag for the LED to strobe on stop error
-
-// Make any switch a reset (Not registered for metastablility)
-assign reset = |sw;
-
-// Tie off unused LEDs
-assign LED[7:3] = 4'h0;
-
-
-// Sends a strobe out every second based on 100 MHz clock
-blink_1sec #(.CLKMHZ(100)) blink_clock (
-    .clk(CLK100MHZ),
-    .rst(reset),
-    .strobe(strobe_1sec)
-);
-
-
-
-// Creates a binary counter out of LEDs[3:0] on board
-always_ff @(posedge CLK100MHZ) begin
-    if (reset) begin
-        LED[0] <= 0;
-    end else begin
-        if (strobe_1sec) begin
-            LED[0] <= ~LED[1:0];
-        end
-    end
-end
-
-// LED Strobe when there is an error
-// LED [1] detects parity errors
-// LED [2] detects stop errors
-// This is just to have a visual representation on the
-// board when there are errors
-always_ff @(posedge CLK100MHZ) begin
-    if (reset) begin
-        par_error_flag  <= 1'b0;
-        stop_error_flag <= 1'b0;
-        LED[2:1]        <= 2'b00;
-    end else begin
-        if (par_error) begin
-            par_error_flag <= 1'b1;
-        end else if (par_error_flag & strobe_1sec) begin
-            par_error_flag <= 1'b0;
-            LED[1] <= 1'b1;
-        end else if (strobe_1sec) begin
-            LED[1] <= 1'b0;
-        end
-
-        if (stop_error) begin
-            stop_error_flag <= 1'b1;
-        end else if (stop_error_flag & strobe_1sec) begin
-            stop_error_flag <= 1'b0;
-            LED[2]          <= 1'b1;
-        end else if (strobe_1sec) begin
-            LED[2]          <= 1'b0;
-        end
-    end
-end
-
-
-// uart wrapper module
-uart_tx_rx #(
+// Instantiate module
+uart_rx #(
     .CLK_PER_BIT(CLK_PER_BIT),
     .PACK_SIZE(PACK_SIZE),
     .PARITY_EN(PARITY_EN),
     .EVEN_PAR(EVEN_PAR)
-) u_uart_wrapper0 (
-    .clk(CLK100MHZ),
-    .rst(reset),
-    .rx_bit(uart_txd_in),
+) u_uart_rx0 (
+    .clk(clk), 
+    .rst(rst),  
+    .rx_bit(rx_bit), 
+    .rx_byte_valid(rx_byte_valid), 
+    .rx_byte_data(rx_byte_data), 
+    .rx_active(rx_active),
+    .par_error(par_error),
+    .stop_error(stop_error)
+);
+
+// Instantiate module
+uart_tx #(
+    .CLK_PER_BIT(CLK_PER_BIT),
+    .PACK_SIZE(PACK_SIZE),
+    .PARITY_EN(PARITY_EN),
+    .EVEN_PAR(EVEN_PAR)
+) u_uart_tx0 (
+    .clk(clk),
+    .rst(rst),
+    .tx_byte_valid(tx_byte_valid),
+    .tx_byte_data(tx_byte_data),
+    .tx_bit(tx_bit),
+    .tx_active(tx_active),
+    .tx_done(tx_done)
+);
+
+endmodule
+
+
+// Minimal test bench since most testing is done in uart_rx and uart_tx
+module uart_top_tb ();
+
+parameter CLK_PER_BIT = 10;      // Using 10 to cut down sim time
+parameter PACK_SIZE   = 8;       // Packet sizes
+parameter PACK_DATA   = 8'hFE;   // Set Packet data
+parameter PARITY_EN   = 1;       // Sets if parity is enabled
+parameter EVEN_PAR    = 0;       // Sets even or odd parity (0 odd, 1 even)
+
+// Define the signals
+logic clk;
+logic rst;
+logic rx_bit;
+logic rx_byte_valid;
+logic [PACK_SIZE - 1:0] rx_byte_data;
+logic rx_active;
+logic par_error;
+logic stop_error;
+logic tx_byte_valid;
+logic [PACK_SIZE - 1:0] tx_byte_data;
+logic tx_bit;
+logic tx_active;
+logic tx_done;
+
+// Instantiate module
+uart_top #(
+    .CLK_PER_BIT(CLK_PER_BIT),
+    .PACK_SIZE(PACK_SIZE),
+    .PARITY_EN(PARITY_EN),
+    .EVEN_PAR(EVEN_PAR)
+) dut (
+    .clk(clk),
+    .rst(rst),
+    .rx_bit(rx_bit),
     .rx_byte_valid(rx_byte_valid),
     .rx_byte_data(rx_byte_data),
     .rx_active(rx_active),
@@ -104,14 +96,47 @@ uart_tx_rx #(
     .stop_error(stop_error),
     .tx_byte_valid(tx_byte_valid),
     .tx_byte_data(tx_byte_data),
-    .tx_bit(uart_rxd_out),
+    .tx_bit(tx_bit),
     .tx_active(tx_active),
-    .tx_done()
+    .tx_done(tx_done)
 );
 
-// Create loopback for data form rx
-assign tx_byte_valid = rx_byte_valid;
-assign tx_byte_data  = rx_byte_data;
+// Create loopback of tx to rx
+assign rx_bit = tx_bit;
+
+// Create clock signal
+initial begin
+    clk <= 0; #5;
+    forever begin 
+        clk <= ~clk; #5;
+    end
+end
+
+task send_packet;
+    // Setup initial data and validate
+    input [PACK_SIZE - 1:0] data;
+    tx_byte_data  <= data;
+    tx_byte_valid <= 1'b1;
+    wait(tx_active);
+    tx_byte_valid <= 1'b0;
+    @(posedge clk);
+    wait(tx_done);
+    @(posedge clk);
+endtask
+
+initial begin
+    rst <= 1; tx_byte_valid <= '0; tx_byte_data <= '0; @(posedge clk);
+    rst <= 0; @(posedge clk);
+    send_packet(PACK_DATA);
+    wait(rx_byte_valid);
+    if (PACK_DATA == rx_byte_data) begin
+        $display("Test Passed!");
+    end else begin
+        $display("Test Failed!");
+    end
+    @(posedge clk);
+    $stop;
+end
 
 
 endmodule

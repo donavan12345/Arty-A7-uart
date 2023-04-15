@@ -1,4 +1,4 @@
-module uart_top_tb();
+module arty_a7_100_top_tb();
 
 logic clk;
 logic [3:0] sw;
@@ -9,8 +9,8 @@ logic [7:0] LED;
 
 
 
-// Instantiate uart_top module
-uart_top dut (
+// Instantiate arty_a7_100_top module
+arty_a7_100_top dut (
     .CLK100MHZ(clk),
     .sw(sw),
     .uart_txd_in(uart_txd_in),
@@ -28,7 +28,7 @@ end
     
     
 initial begin
-    sw[3:1] <= '0; sw[0] <= '1; @(posedge clk);
+    sw[3:1] <= '0; sw[0] <= '1; uart_txd_in <= 1'b1;@(posedge clk);
     sw[0] <= '0; @(posedge clk);
     for (int i = 0; i < 20; i++) begin
         @(posedge clk);

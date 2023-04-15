@@ -2,9 +2,9 @@
 vlib work
 
 # Compile Verilog
+vlog ../../src/uart_rx.sv
+vlog ../../src/uart_tx.sv
 vlog ../../src/uart_top.sv
-vlog ../../testbench/uart_top_tb.sv
-vlog ../../src/blink_1sec.sv
 
 # Call vsim to invoke simulator
 #     Make sure the last item on the line is the name of the
