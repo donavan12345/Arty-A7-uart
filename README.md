@@ -9,4 +9,5 @@ This project is a customizable UART in SystemVerilog. The board used for the pro
 - src         : Contains any .sv files used for project
 - testbench   : Holds top level testbench files (Each module has its own tb in file)
 - tools       : Any tools used, Modelsim is here, but I usually put my Vivado project here as well
+
 ---- Modelsim    : Place to run modelsim tests
