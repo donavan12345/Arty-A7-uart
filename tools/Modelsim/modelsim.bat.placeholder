@@ -1,2 +1,2 @@
-:: Make this path point to your modelsim and then rename the file to "modelsim.bat"
+:: Make this path point to your modelsim and then rename the file to "modelsim.bat" and delete comment
 C:\<Path to Modelsim>\modelsim_ase\win32aloem\modelsim.exe
