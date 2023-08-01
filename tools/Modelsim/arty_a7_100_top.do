@@ -2,6 +2,7 @@
 vlib work
 
 # Compile Verilog
+vlog ../../src/interfaces/interfaces.sv
 vlog ../../src/arty_a7_100_top.sv
 vlog ../../testbench/arty_a7_100_top_tb.sv
 vlog ../../src/uart_rx.sv

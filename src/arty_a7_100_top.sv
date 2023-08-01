@@ -1,3 +1,5 @@
+`include "interfaces/interfaces.sv"
+
 module arty_a7_100_top (
    input CLK100MHZ,
    input [3:0] sw,
@@ -20,9 +22,7 @@ logic                     tx_byte_valid;  // Valid for tx data packet
 logic                     tx_active;      // Shows when a uart tx is sending
 
 // rx signal set
-logic [PACK_SIZE - 1 : 0] rx_byte_data;    // Data packet to send on uart
-logic                     rx_byte_valid;   // Valid for tx data packet
-logic                     rx_active;       // Shows when a uart tx is sending
+itf_rx                    #(.PACK_SIZE(PACK_SIZE)) rx_0 (CLK100MHZ);    // rx data interface
 logic                     par_error;       // Strobes when parity error detected
 logic                     stop_error;      // Strobes when stop error detected
 logic                     par_error_flag;  // Sets up a flag for the LED to strobe on par error
@@ -96,10 +96,7 @@ uart_top #(
 ) u_uart_wrapper0 (
     .clk(CLK100MHZ),
     .rst(reset),
-    .rx_bit(uart_txd_in),
-    .rx_byte_valid(rx_byte_valid),
-    .rx_byte_data(rx_byte_data),
-    .rx_active(rx_active),
+    .itf_rx(rx_0.routing),
     .par_error(par_error),
     .stop_error(stop_error),
     .tx_byte_valid(tx_byte_valid),
@@ -109,9 +106,12 @@ uart_top #(
     .tx_done()
 );
 
+// Set interface values to top level
+assign rx_0.rx_bit = uart_txd_in;
+
 // Create loopback for data form rx
-assign tx_byte_valid = rx_byte_valid;
-assign tx_byte_data  = rx_byte_data;
+assign tx_byte_valid = rx_0.rx_byte_valid;
+assign tx_byte_data  = rx_0.rx_byte_data;
 
 
 endmodule

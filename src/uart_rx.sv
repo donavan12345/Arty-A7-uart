@@ -4,13 +4,13 @@
 // Parameterizable UART data packet size
 // PARITY_EN enables the parity bit (1 or 0)
 // EVEN_PAR says if even or odd parity (0 odd, 1 even)
+
+`include "interfaces/interfaces.sv"
+
 module uart_rx #( parameter CLK_PER_BIT = 868, PACK_SIZE = 8, PARITY_EN = 0, EVEN_PAR = 0) (
     input                           clk,             // input
     input                           rst,             // input
-    input                           rx_bit,          // input
-    output logic                    rx_byte_valid,   // output
-    output logic [PACK_SIZE - 1 :0] rx_byte_data,    // output [PACK_SIZE - 1 :0]
-    output logic                    rx_active,       // output
+    itf_rx                          rx0,             // rx_interface
     output logic                    par_error,       // output
     output logic                    stop_error       // output
 );
@@ -31,7 +31,7 @@ always_ff @(posedge clk) begin
         rx_bit_r0 <= '1;
         rx_bit_r1 <= '1;
     end else begin
-        rx_bit_r0 <= rx_bit;
+        rx_bit_r0 <= rx_0.rx_bit;
         rx_bit_r1 <= rx_bit_r0;
     end
 end
@@ -44,8 +44,8 @@ always_ff @(posedge clk) begin
             // Set all signals to initial state
             clk_counter    <= '0;
             data_index     <= '0;
-            rx_byte_valid  <= '0;
-            rx_active      <= '0;
+            rx_0.rx_byte_valid  <= '0;
+            rx_0.rx_active      <= '0;
             stop_error     <= '0;
             par_error      <= '0;
             par_error_flag <= '0;
@@ -53,7 +53,7 @@ always_ff @(posedge clk) begin
             // If rx bit goes low then move to start state
             if (!rx_bit_r1) begin
                 RX_STATE <= START;
-                rx_active <= 1'b1;
+                rx_0.rx_active <= 1'b1;
             end
         end
 
@@ -78,7 +78,7 @@ always_ff @(posedge clk) begin
         DATA: begin
             // Every clk set add new bit to data byte
             if (clk_counter >= CLK_PER_BIT - 1) begin
-                rx_byte_data[data_index] <= rx_bit_r1;
+                rx_0.rx_byte_data[data_index] <= rx_bit_r1;
                 data_index               <= data_index + 1;
                 clk_counter              <= 0;
                 // Once all bits are filled move to get stop bit
@@ -101,11 +101,11 @@ always_ff @(posedge clk) begin
                 // Send a pulse error based on if the parity bit is incorrect
                 // Also set parity bit error flag so packet is not valid in stop state
                 if(EVEN_PAR) begin
-                    par_error      <= (^rx_byte_data != rx_bit_r1); 
-                    par_error_flag <= (^rx_byte_data != rx_bit_r1);                   
+                    par_error      <= (^rx_0.rx_byte_data != rx_bit_r1); 
+                    par_error_flag <= (^rx_0.rx_byte_data != rx_bit_r1);                   
                 end else begin
-                    par_error      <= (~^rx_byte_data != rx_bit_r1);
-                    par_error_flag <= (~^rx_byte_data != rx_bit_r1); 
+                    par_error      <= (~^rx_0.rx_byte_data != rx_bit_r1);
+                    par_error_flag <= (~^rx_0.rx_byte_data != rx_bit_r1); 
                 end
                 RX_STATE    <= STOP;
                 clk_counter <= '0;
@@ -124,14 +124,14 @@ always_ff @(posedge clk) begin
                 // Checks if stop bit is correct and if there was a parity error
                 // If either have a problem then the uart packet was not valid
                 if(rx_bit_r1 & !par_error_flag) begin
-                    rx_byte_valid <= 1'b1;
+                    rx_0.rx_byte_valid <= 1'b1;
                 end else begin
-                    rx_byte_valid <= 1'b0;
+                    rx_0.rx_byte_valid <= 1'b0;
                 end
                 
                 // Update state and status bits
                 RX_STATE <= IDLE;
-                rx_active <= 1'b0;
+                rx_0.rx_active <= 1'b0;
 
                 // Sends a pulse error if stop bit is low
                 stop_error <= ~rx_bit_r1;
@@ -164,10 +164,7 @@ parameter TOTAL_SIZE  = PACK_SIZE + 2 + PARITY_EN; // Data size + start and stop
 // Define the signals
 logic clk;
 logic rst;
-logic rx_bit;
-logic rx_byte_valid;
-logic [PACK_SIZE - 1:0] rx_byte_data;
-logic rx_active;
+itf_rx   #(.PACK_SIZE(PACK_SIZE)) rx_0 (clk);
 logic par_error;
 logic stop_error;
 
@@ -180,10 +177,7 @@ uart_rx #(
 ) dut (
     .clk(clk),                       // Input
     .rst(rst),                       // Input
-    .rx_bit(rx_bit),                 // Input
-    .rx_byte_valid(rx_byte_valid),   // Output
-    .rx_byte_data(rx_byte_data),     // Output
-    .rx_active(rx_active),           // Output
+    .itf_rx(rx_0.routing),           // rx_interface           
     .par_error(par_error),           // Output
     .stop_error(stop_error)          // Output
 );
@@ -253,7 +247,7 @@ task recieve_packet(
     
     // Send UART packet
     for (int i = 0; i < TOTAL_SIZE; i = i + 1) begin
-        rx_bit <= full_pack[i];
+        rx_0.rx_bit <= full_pack[i];
         repeat(CLK_PER_BIT) @(posedge clk);
     end
 
@@ -265,17 +259,17 @@ task recieve_packet(
         $display("Forced Parity Error!\n\n");
     end else if (force_stop_error) begin
         $display("Forced Stop Error!\n\n");
-    end else if (PACK_DATA == rx_byte_data & rx_byte_valid) begin
-        $display("Test Passed, expected: 0x%h, received: 0x%h!\n\n", PACK_DATA, rx_byte_data);
+    end else if (PACK_DATA == rx_0.rx_byte_data & rx_0.rx_byte_valid) begin
+        $display("Test Passed, expected: 0x%h, received: 0x%h!\n\n", PACK_DATA, rx_0.rx_byte_data);
     end else begin
-        $display("Test Failed, expected: 0x%h, received: 0x%h!\n\n", PACK_DATA, rx_byte_data);
+        $display("Test Failed, expected: 0x%h, received: 0x%h!\n\n", PACK_DATA, rx_0.rx_byte_data);
     end
     $display("----------------------------------------------\n");
 
 endtask
 
 initial begin
-    rst <= 1; rx_bit <= '1; @(posedge clk);
+    rst <= 1; rx_0.rx_bit <= '1; @(posedge clk);
     rst <= 0; repeat(3) @(posedge clk);
     recieve_packet(PACK_DATA, 1'b1);
     recieve_packet(PACK_DATA, 1'b0, 1'b1);

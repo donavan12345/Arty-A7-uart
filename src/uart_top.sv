@@ -3,13 +3,12 @@
 // PARITY_EN enables the parity bit (1 or 0)
 // EVEN_PAR says if even or odd parity (0 odd, 1 even)
 
+`include "interfaces/interfaces.sv"
+
 module uart_top #( parameter CLK_PER_BIT = 868, PACK_SIZE = 8, PARITY_EN = 0, EVEN_PAR = 0) (    
     input                           clk,             // input
     input                           rst,             // input
-    input                           rx_bit,          // input
-    output logic                    rx_byte_valid,   // output
-    output logic [PACK_SIZE - 1 :0] rx_byte_data,    // output [PACK_SIZE - 1 :0]
-    output logic                    rx_active,       // output
+    itf_rx                          rx_0,            // rx_interface
     output logic                    par_error,       // output
     output logic                    stop_error,      // output
     input                           tx_byte_valid,   // input
@@ -28,10 +27,7 @@ uart_rx #(
 ) u_uart_rx0 (
     .clk(clk), 
     .rst(rst),  
-    .rx_bit(rx_bit), 
-    .rx_byte_valid(rx_byte_valid), 
-    .rx_byte_data(rx_byte_data), 
-    .rx_active(rx_active),
+    .rx0(rx0.routing),
     .par_error(par_error),
     .stop_error(stop_error)
 );
@@ -67,10 +63,7 @@ parameter EVEN_PAR    = 0;       // Sets even or odd parity (0 odd, 1 even)
 // Define the signals
 logic clk;
 logic rst;
-logic rx_bit;
-logic rx_byte_valid;
-logic [PACK_SIZE - 1:0] rx_byte_data;
-logic rx_active;
+itf_rx #(.PACK_SIZE(PACK_SIZE)) rx_0 (clk);
 logic par_error;
 logic stop_error;
 logic tx_byte_valid;
@@ -88,10 +81,7 @@ uart_top #(
 ) dut (
     .clk(clk),
     .rst(rst),
-    .rx_bit(rx_bit),
-    .rx_byte_valid(rx_byte_valid),
-    .rx_byte_data(rx_byte_data),
-    .rx_active(rx_active),
+    .itf_rx(rx_0.routing),           // rx_interface  
     .par_error(par_error),
     .stop_error(stop_error),
     .tx_byte_valid(tx_byte_valid),
@@ -102,7 +92,7 @@ uart_top #(
 );
 
 // Create loopback of tx to rx
-assign rx_bit = tx_bit;
+assign rx_0.rx_bit = tx_bit;
 
 // Create clock signal
 initial begin
@@ -128,8 +118,8 @@ initial begin
     rst <= 1; tx_byte_valid <= '0; tx_byte_data <= '0; @(posedge clk);
     rst <= 0; @(posedge clk);
     send_packet(PACK_DATA);
-    wait(rx_byte_valid);
-    if (PACK_DATA == rx_byte_data) begin
+    wait(rx_0.rx_byte_valid);
+    if (PACK_DATA == rx_0.rx_byte_data) begin
         $display("Test Passed!");
     end else begin
         $display("Test Failed!");
