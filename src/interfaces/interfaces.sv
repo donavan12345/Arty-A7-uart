@@ -1,3 +1,4 @@
+// TODO: Create generic rx and tx and then modport for direction
 interface itf_rx #(parameter PACK_SIZE = 8) (input clk);
     logic rx_bit;
     logic rx_byte_valid;
