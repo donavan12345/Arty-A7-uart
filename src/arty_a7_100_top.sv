@@ -96,7 +96,7 @@ uart_top #(
 ) u_uart_wrapper0 (
     .clk(CLK100MHZ),
     .rst(reset),
-    .itf_rx(rx_0.routing),
+    .rx_0(rx_0.routing),
     .par_error(par_error),
     .stop_error(stop_error),
     .tx_byte_valid(tx_byte_valid),

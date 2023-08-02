@@ -24,10 +24,10 @@ uart_rx #(
     .PACK_SIZE(PACK_SIZE),
     .PARITY_EN(PARITY_EN),
     .EVEN_PAR(EVEN_PAR)
-) u_uart_rx0 (
+) u_uart_rx_0 (
     .clk(clk), 
     .rst(rst),  
-    .rx0(rx0.routing),
+    .rx_0(rx_0),
     .par_error(par_error),
     .stop_error(stop_error)
 );
@@ -81,7 +81,7 @@ uart_top #(
 ) dut (
     .clk(clk),
     .rst(rst),
-    .itf_rx(rx_0.routing),           // rx_interface  
+    .rx_0(rx_0.routing),           // rx_interface  
     .par_error(par_error),
     .stop_error(stop_error),
     .tx_byte_valid(tx_byte_valid),

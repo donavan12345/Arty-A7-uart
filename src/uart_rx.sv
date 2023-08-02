@@ -10,7 +10,7 @@
 module uart_rx #( parameter CLK_PER_BIT = 868, PACK_SIZE = 8, PARITY_EN = 0, EVEN_PAR = 0) (
     input                           clk,             // input
     input                           rst,             // input
-    itf_rx                          rx0,             // rx_interface
+    itf_rx                          rx_0,             // rx_interface
     output logic                    par_error,       // output
     output logic                    stop_error       // output
 );
@@ -177,7 +177,7 @@ uart_rx #(
 ) dut (
     .clk(clk),                       // Input
     .rst(rst),                       // Input
-    .itf_rx(rx_0.routing),           // rx_interface           
+    .rx_0(rx_0.routing),           // rx_interface           
     .par_error(par_error),           // Output
     .stop_error(stop_error)          // Output
 );
